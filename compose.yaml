@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: platform_dev
+      POSTGRES_PASSWORD: local_only_not_for_production
+      POSTGRES_DB: platform_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform_dev -d platform_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    build:
+      context: ./api
+    environment:
+      APP_ENV: local
+      DATABASE_URL: postgres://platform_dev:local_only_not_for_production@db:5432/platform_dev
+      RUST_LOG: info
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+  dashboard:
+    build:
+      context: ./apps/dashboard
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - api
+volumes:
+  postgres_data:
