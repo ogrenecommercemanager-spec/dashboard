@@ -1,38 +1,61 @@
-# Rust API architecture
+## Current module structure (TB-01.1)
 
-**Approach:** Axum modular monolith initially, one binary/deployment. SQLx handles PostgreSQL, migrations, transactions and typed queries. REST `/v1` and OpenAPI contracts as PRD 02 matures.
+The Rust API uses a modular monolith architecture. All API modules are compiled into one application and deployed together.
 
-## Target module shape (PRD 02)
+```text
+api/
+├── src/
+│   ├── main.rs
+│   ├── lib.rs
+│   ├── app.rs
+│   ├── state.rs
+│   ├── error.rs
+│   └── businesses/
+│       ├── mod.rs
+│       ├── handlers.rs
+│       ├── models.rs
+│       ├── service.rs
+│       └── repository.rs
+├── migrations/
+└── tests/
+    ├── business_db.rs
+    └── business_http.rs
 ```
-api/src/
-  main.rs              # config, startup, shutdown
-  app.rs               # router composition and app state
-  config.rs            # validated configuration
-  error.rs             # typed API error envelope
-  auth/                # Firebase identity, tenant resolver, authorization
-  businesses/
-    mod.rs
-    routes.rs          # endpoint registration
-    handlers.rs        # HTTP input/output only
-    service.rs         # domain decisions and transaction boundaries
-    repository.rs      # SQLx queries only
-    models.rs          # domain and DTO types
-  catalog/ inventory/ orders/ payments/ audit/ jobs/
-```
 
-**Important:** TB-01.1 keeps its tiny routes in `main.rs` strictly for simplicity; refactor in TB-02.1 instead of prematurely generating empty modules.
+### Responsibilities
 
-## Request flow
-Request → correlation/request ID → verified Firebase identity (PRD 03) → membership & capability check → service → RLS-scoped database transaction → response. All tenant-owned SQL must execute under verified per-transaction context; revoke or missing context fails closed. No direct client-to-database or agent direct SQL.
+- **main.rs:** Application initialization, environment configuration, database connections, migrations, and HTTP server startup.
+- **lib.rs:** Exposes application modules for reuse and integration testing.
+- **app.rs:** Constructs the Axum router and registers HTTP endpoints.
+- **state.rs:** Defines shared application resources, including the PostgreSQL connection pool.
+- **error.rs:** Defines reusable API errors and HTTP error responses.
+- **handlers.rs:** Extracts HTTP inputs, calls services, and constructs HTTP responses.
+- **service.rs:** Implements business rules and coordinates operations.
+- **repository.rs:** Owns SQLx database queries and persistence operations.
+- **models.rs:** Defines Rust structures representing business records and API data.
 
-## Conventions
-- Handler parses/validates; service handles business invariants; repository owns SQL.
-- Explicit transactions for multi-step writes; use DB constraints as backstop.
-- Money is integer minor units plus currency; never use float money arithmetic.
-- API errors eventually use `{code,message,request_id,details?}`; no SQL internals or tenant details leaked.
-- Distinguish readiness (DB reachable) from liveness (process healthy) before cloud rollout.
-- Use outbox and idempotency keys for later durable side effects.
-- Keep generated OpenAPI + TypeScript/Swift clients versioned and drift-tested.
+### Adding a new API feature
 
-## Security boundary
-`/v1/dev/*` endpoints are **local tracer only**, disabled unless `APP_ENV=local`. They have no authentication and must never be exposed publicly. Remove/replace before any public environment.
+When implementing a new domain capability:
+
+1. Define the data structures and request/response models.
+2. Implement database operations in the repository.
+3. Implement validation, business rules, and transaction coordination in the service.
+4. Implement HTTP handlers that call the service.
+5. Register endpoints through the router.
+6. Add focused integration tests for successful and rejected operations.
+7. Update API contracts and architecture documentation when necessary.
+
+Do not place arbitrary SQL queries or substantial business logic directly in HTTP handlers.
+
+### Current limitations and planned improvements
+
+TB-01.1 establishes the basic module architecture and verifies local database and HTTP behavior.
+
+The current development endpoints are unauthenticated and must never be exposed publicly. Authentication, tenant isolation, capability-based authorization, structured API contracts, and more comprehensive observability will be introduced in subsequent PRDs.
+
+### Architectural decision
+
+The platform begins as a modular monolith rather than independently deployed microservices.
+
+Modules should maintain clear domain boundaries so that individual components can be extracted into separate services if future scaling or operational requirements justify it. Deployment independence is not currently required between backend modules.
