@@ -109,4 +109,5 @@ async fn blocks_dev_endpooints_outside_local_mode(pool: PgPool) {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(1, 2);
 }
