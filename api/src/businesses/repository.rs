@@ -1,13 +1,9 @@
-
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::models::Business;
 
-pub async fn create_business(
-    pool: &PgPool,
-    name: &str,
-) -> Result<Business, sqlx::Error> {
+pub async fn create_business(pool: &PgPool, name: &str) -> Result<Business, sqlx::Error> {
     let id = Uuid::new_v4();
 
     sqlx::query_as::<_, Business>(
@@ -21,10 +17,7 @@ pub async fn create_business(
     .await
 }
 
-pub async fn find_business(
-    pool: &PgPool,
-    id: Uuid,
-) -> Result<Option<Business>, sqlx::Error> {
+pub async fn find_business(pool: &PgPool, id: Uuid) -> Result<Option<Business>, sqlx::Error> {
     sqlx::query_as::<_, Business>(
         "SELECT id, name
          FROM businesses
