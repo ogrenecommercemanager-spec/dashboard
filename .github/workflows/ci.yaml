@@ -95,6 +95,12 @@ jobs:
         working-directory: .
         run: docker compose up -d --build
 
+      - name: Inspect Docker containers
+        working-directory: .
+        run: |
+          docker compose ps -a
+          docker compose logs --tail=100 api db dashboard
+
       - name: Wait for API
         run: |
           curl --fail \
